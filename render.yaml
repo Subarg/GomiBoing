@@ -9,7 +9,7 @@ services:
   - type: web
     name: gomiboing-api
     runtime: docker
-    rootDir: backend
+    rootDir: api-gomiboing  # <-- Regresamos a la carpeta que sí tiene el composer.json
     plan: free
     healthCheckPath: /up
     envVars:
