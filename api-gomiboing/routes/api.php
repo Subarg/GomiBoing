@@ -18,11 +18,13 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
-Route::get('/configurar-bd', function () {
-    Artisan::call('migrate', ['--force' => true]);
-    Artisan::call('optimize:clear');
-
-    return '¡Migraciones ejecutadas y caché limpia con éxito!';
+Route::get('/forzar-migracion', function () {
+    try {
+        Artisan::call('migrate', ['--force' => true]);
+        return '<pre>Resultado de migración:\n' . Artisan::output() . '</pre>';
+    } catch (\Exception $e) {
+        return '<pre>ERROR SQL:\n' . $e->getMessage() . '</pre>';
+    }
 });
 
 // Diagnóstico: versión del backend y migraciones que faltan (lo usa la app para avisar si el servidor está desactualizado)
