@@ -14,37 +14,9 @@ use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\RecetaController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VentaController;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
-Route::get('/forzar-migracion', function () {
-    try {
-        Artisan::call('migrate', ['--force' => true]);
-        return '<pre>Resultado de migración:\n' . Artisan::output() . '</pre>';
-    } catch (\Exception $e) {
-        return '<pre>ERROR SQL:\n' . $e->getMessage() . '</pre>';
-    }
-});
-
-Route::get('/limpieza-profunda', function () {
-    try {
-        $output = '';
-        
-        // 1. Limpia toda la caché guardada
-        Artisan::call('optimize:clear');
-        $output .= "Caché limpia.\n";
-        
-        // 2. Refresca la caché de rutas y configuración
-        Artisan::call('config:cache');
-        Artisan::call('route:cache');
-        $output .= "Configuración y rutas cacheadas.\n";
-
-        return '<pre>Limpieza completada:\n' . $output . '</pre>';
-    } catch (\Exception $e) {
-        return '<pre>ERROR:\n' . $e->getMessage() . '</pre>';
-    }
-});
 
 // Diagnóstico: versión del backend y migraciones que faltan (lo usa la app para avisar si el servidor está desactualizado)
 Route::get('/estado', function () {
