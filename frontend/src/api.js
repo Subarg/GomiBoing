@@ -13,7 +13,7 @@ api.interceptors.response.use(
   (r) => r,
   (error) => {
     if (error.response?.status === 401 && !error.config.url.includes('/login')) {
-      localStorage.removeItem('token')
+      ;['token', 'rol', 'user'].forEach((k) => localStorage.removeItem(k))
       window.location.href = '/login'
     }
     return Promise.reject(error)
@@ -27,6 +27,9 @@ export function mensajeError(e) {
     return 'El servidor no tiene la versión más reciente del backend (falta una ruta). Actualiza el backend y ejecuta "php artisan migrate" y "php artisan optimize:clear".'
   }
   if (d?.errors) return Object.values(d.errors).flat().join(' ')
+  if (e.response?.status >= 500) {
+    return 'Error en el servidor. Si acabas de actualizar la app, ejecuta "php artisan migrate" y "php artisan optimize:clear" en el backend; el detalle está en storage/logs/laravel.log.'
+  }
   return d?.message || 'No se pudo completar la acción. Revisa tu conexión.'
 }
 

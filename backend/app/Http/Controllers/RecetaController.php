@@ -11,6 +11,7 @@ class RecetaController extends Controller
     {
         return [
             'id' => $p->id, 'nombre' => $p->nombre, 'sabor' => $p->sabor, 'tamano' => $p->tamano,
+            'activo' => (bool) $p->activo, 'precio_venta' => $p->precio_venta, 'comision' => $p->comision,
             'receta' => $p->insumos->map(fn ($i) => [
                 'insumo_id' => $i->id, 'nombre' => $i->nombre, 'unidad_medida' => $i->unidad_medida,
                 'cantidad' => (float) $i->pivot->cantidad_requerida,

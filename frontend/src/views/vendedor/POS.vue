@@ -95,7 +95,7 @@ onMounted(async () => {
       </template>
     </section>
 
-    <aside class="card h-fit lg:sticky lg:top-4">
+    <aside id="cuenta" class="card h-fit lg:sticky lg:top-4 scroll-mt-16">
       <h2 class="text-2xl font-bold mb-3">Cuenta</h2>
       <p v-if="!cart.items.length" class="text-tinta/60 text-sm">Toca un sabor para agregarlo.</p>
 
@@ -146,4 +146,11 @@ onMounted(async () => {
       </button>
     </aside>
   </div>
+
+  <!-- Barra de cuenta en teléfono -->
+  <a v-if="cart.items.length" href="#cuenta"
+    class="lg:hidden fixed bottom-3 inset-x-3 z-20 bg-uva text-white rounded-xl px-4 py-3 flex justify-between items-center shadow-lg font-bold">
+    <span>Cuenta · {{ cart.unidades }} pzas</span><span class="font-display text-xl">{{ money(cart.total) }} ›</span>
+  </a>
+  <div v-if="cart.items.length" class="h-16 lg:hidden"></div>
 </template>

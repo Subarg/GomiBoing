@@ -16,7 +16,7 @@ const unidad = (id) => inv.insumos.find((i) => i.id === id)?.unidad_medida ?? ''
 
 async function cargar() {
   await inv.fetchInsumos()
-  const data = (await api.get('/admin/recetas')).data
+  const data = (await api.get('/admin/recetas')).data.map((p) => ({ ...p, activo: p.activo ?? true }))
   guardadas.value = JSON.parse(JSON.stringify(data))
   productos.value = data.map((p) => ({ ...p, sucio: false }))
 }
@@ -59,10 +59,11 @@ async function aplicarMasivo() {
   } catch (e) { fallo(e) }
 }
 
+const activas = computed(() => guardadas.value.filter((p) => p.activo))
 // Matriz: insumos (filas) x productos (columnas) con la receta vigente
 const filas = computed(() => {
   const mapa = new Map()
-  for (const p of guardadas.value) {
+  for (const p of activas.value) {
     for (const l of p.receta) {
       const esBoing = l.nombre.startsWith('Boing ')
       const key = esBoing ? 'boing' : l.insumo_id
@@ -131,13 +132,13 @@ onMounted(cargar)
       <thead>
         <tr>
           <th class="th">Insumo</th>
-          <th v-for="p in guardadas" :key="p.id" class="th text-right whitespace-nowrap">{{ p.sabor }} {{ p.tamano }}</th>
+          <th v-for="p in activas" :key="p.id" class="th text-right whitespace-nowrap">{{ p.sabor }} {{ p.tamano }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="f in filas" :key="f.key">
           <td class="td font-bold">{{ f.nombre }} <span class="font-normal text-tinta/60">({{ f.unidad }})</span></td>
-          <td v-for="p in guardadas" :key="p.id" class="td text-right" :class="f.valores[p.id] ? '' : 'text-tinta/30'">
+          <td v-for="p in activas" :key="p.id" class="td text-right" :class="f.valores[p.id] ? '' : 'text-tinta/30'">
             {{ f.valores[p.id] ? num(f.valores[p.id]) : '—' }}
           </td>
         </tr>
@@ -149,7 +150,7 @@ onMounted(cargar)
   <section class="space-y-3">
     <details v-for="p in productos" :key="p.id" class="card group">
       <summary class="cursor-pointer font-display text-lg font-bold flex justify-between gap-2">
-        <span>{{ p.nombre }}</span>
+        <span>{{ p.nombre }}<span v-if="!p.activo" class="ml-2 text-xs text-chamoy font-sans font-normal">Inactivo</span></span>
         <span class="text-sm font-sans font-normal text-tinta/60">{{ p.sucio ? 'Sin guardar' : `${p.receta.length} insumos` }}</span>
       </summary>
 

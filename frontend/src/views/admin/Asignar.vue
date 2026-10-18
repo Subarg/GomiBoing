@@ -9,6 +9,7 @@ const userId = ref('')
 const lote = ref([])        // inventario actual del vendedor
 const lineas = ref([{ insumo_id: '', cantidad: 0 }])
 const fondo = ref(0)
+const fondoActual = ref(null) // fondo ya guardado para el vendedor elegido
 const error = ref('')
 const aviso = ref('')
 
@@ -22,15 +23,15 @@ const unidad = (id) => inv.insumos.find((i) => i.id === id)?.unidad_medida ?? ''
 const existencia = (id) => inv.insumos.find((i) => i.id === id)?.stock_almacen ?? 0
 
 async function cargarVendedor() {
-  if (!userId.value) { lote.value = []; fondo.value = 0; return }
+  if (!userId.value) { lote.value = []; fondo.value = 0; fondoActual.value = null; return }
   const [l, f] = await Promise.allSettled([
     api.get(`/admin/vendedores/${userId.value}/inventario`),
     api.get(`/admin/vendedores/${userId.value}/fondo`),
   ])
   if (l.status === 'fulfilled') lote.value = l.value.data
   else { lote.value = []; error.value = mensajeError(l.reason) }
-  if (f.status === 'fulfilled') fondo.value = f.value.data.monto
-  else { fondo.value = 0; error.value = mensajeError(f.reason) }
+  if (f.status === 'fulfilled') { fondo.value = f.value.data.monto; fondoActual.value = f.value.data.monto }
+  else { fondo.value = 0; fondoActual.value = null; error.value = mensajeError(f.reason) }
 }
 watch(userId, cargarVendedor)
 
@@ -52,6 +53,7 @@ async function guardarFondo() {
   error.value = ''; aviso.value = ''
   try {
     await api.post('/admin/fondos', { user_id: userId.value, monto: fondo.value })
+    fondoActual.value = fondo.value
     aviso.value = `Fondo de caja guardado: ${money(fondo.value)}.`
   } catch (e) { error.value = mensajeError(e) }
 }
@@ -85,6 +87,9 @@ onMounted(async () => {
           </select>
         </div>
 
+        <p v-if="userId && fondoActual !== null" class="rounded-lg bg-mango-claro px-3 py-2">
+          Fondo de caja asignado: <b class="font-display text-xl">{{ money(fondoActual) }}</b>
+        </p>
         <form class="flex items-end gap-3" @submit.prevent="guardarFondo">
           <div class="flex-1">
             <label class="label" for="a-fondo">Fondo de caja (cambio del día)</label>

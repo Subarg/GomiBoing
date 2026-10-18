@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\Insumo;
 use App\Models\InventarioVendedor;
 use App\Models\Merma;
+use App\Models\Producto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -48,6 +49,10 @@ class InsumoController extends Controller
             422, 'Algún vendedor todavía tiene este insumo asignado. Pide el corte o devuélvelo al almacén primero.'
         );
         DB::transaction(function () use ($insumo) {
+            // Un producto sin su Boing no se puede preparar: se desactiva (ej. un sabor que ya no manejas)
+            if (str_starts_with($insumo->nombre, 'Boing ')) {
+                Producto::whereIn('id', DB::table('recetas')->where('insumo_id', $insumo->id)->pluck('producto_id'))->update(['activo' => false]);
+            }
             Merma::where('insumo_id', $insumo->id)->delete();
             $insumo->delete(); // recetas, compras e inventario vacío se eliminan en cascada
         });

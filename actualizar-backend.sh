@@ -7,9 +7,12 @@ DEST="${1:-api-gomiboing}"
 
 cp -R backend/. "$DEST/"
 cd "$DEST"
+composer dump-autoload -q
 php artisan migrate --force
 php artisan optimize:clear
 
 echo
-echo "Rutas nuevas registradas (deben aparecer fondos, surtido y recetas):"
-php artisan route:list --path=api/admin | grep -E "fondos|surtido|recetas" || echo "  ¡No aparecen! Revisa que routes/api.php se haya copiado."
+echo "Verificación de versión (debe aparecer 'estado', 'fondos', 'surtido', 'recetas', 'sabores', 'cortes'):"
+php artisan route:list --path=api | grep -E "estado|fondos|surtido|recetas|sabores|cortes" || echo "  ¡No aparecen! routes/api.php no se copió."
+echo
+echo "Reinicia el servidor (php artisan serve) y abre la app: si el backend sigue desactualizado verás un aviso rojo arriba."

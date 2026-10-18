@@ -8,11 +8,14 @@ const routes = [
   { path: '/admin', component: () => import('../views/admin/Dashboard.vue'), meta: { rol: 'admin' } },
   { path: '/admin/insumos', component: () => import('../views/admin/Insumos.vue'), meta: { rol: 'admin' } },
   { path: '/admin/recetas', component: () => import('../views/admin/Recetas.vue'), meta: { rol: 'admin' } },
+  { path: '/admin/sabores', component: () => import('../views/admin/Sabores.vue'), meta: { rol: 'admin' } },
+  { path: '/admin/cortes', component: () => import('../views/admin/Cortes.vue'), meta: { rol: 'admin' } },
   { path: '/admin/asignar', component: () => import('../views/admin/Asignar.vue'), meta: { rol: 'admin' } },
   { path: '/admin/vendedores', component: () => import('../views/admin/Vendedores.vue'), meta: { rol: 'admin' } },
 
   { path: '/vendedor', component: () => import('../views/vendedor/POS.vue'), meta: { rol: 'vendedor' } },
   { path: '/vendedor/inventario', component: () => import('../views/vendedor/Inventario.vue'), meta: { rol: 'vendedor' } },
+  { path: '/vendedor/historial', component: () => import('../views/vendedor/Historial.vue'), meta: { rol: 'vendedor' } },
   { path: '/vendedor/corte', component: () => import('../views/vendedor/Corte.vue'), meta: { rol: 'vendedor' } },
 
   { path: '/:pathMatch(.*)*', redirect: '/' },

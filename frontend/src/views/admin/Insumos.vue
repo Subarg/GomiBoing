@@ -2,10 +2,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useInventoryStore } from '../../stores/inventory'
 import api, { mensajeError, money, num } from '../../api'
+import ProveedorSelect from '../../components/ProveedorSelect.vue'
 
 const inv = useInventoryStore()
 const entradas = ref([])
-const sabores = ref([])
+const productosActivos = ref([])
+// Sabores activos del tamaño elegido (un sabor que ya no manejas en 500 ml no aparece)
+const sabores = computed(() => [...new Set(productosActivos.value.filter((p) => p.tamano === surtido.value.tamano).map((p) => p.sabor))])
 const error = ref('')
 const aviso = ref('')
 
@@ -31,9 +34,7 @@ const edicion = ref(null)
 async function cargar() {
   await Promise.all([inv.fetchInsumos(), inv.fetchAlertas()])
   entradas.value = (await api.get('/admin/entradas')).data
-  if (!sabores.value.length) {
-    sabores.value = [...new Set((await api.get('/productos')).data.map((p) => p.sabor))]
-  }
+  productosActivos.value = (await api.get('/productos')).data
 }
 
 const ok = (m) => { error.value = ''; aviso.value = m }
@@ -87,6 +88,27 @@ async function eliminar(i) {
   try { await api.delete(`/admin/insumos/${i.id}`); ok(`"${i.nombre}" eliminado.`); await cargar() } catch (e) { fallo(e) }
 }
 
+// ---- Filtros y orden del almacén
+const orden = ref('nombre')
+const filtroUnidad = ref('')
+const busqueda = ref('')
+const soloBajos = ref(false)
+const ordenes = {
+  nombre: ['Nombre (A-Z)', (a, b) => a.nombre.localeCompare(b.nombre)],
+  mayor: ['Mayor cantidad', (a, b) => b.stock_almacen - a.stock_almacen],
+  menor: ['Menor cantidad', (a, b) => a.stock_almacen - b.stock_almacen],
+  caro: ['Más caro (costo unitario)', (a, b) => b.costo_unitario - a.costo_unitario],
+  barato: ['Más barato (costo unitario)', (a, b) => a.costo_unitario - b.costo_unitario],
+  valor: ['Mayor valor en almacén', (a, b) => b.stock_almacen * b.costo_unitario - a.stock_almacen * a.costo_unitario],
+  tipo: ['Tipo (gr, ml, pza)', (a, b) => a.unidad_medida.localeCompare(b.unidad_medida) || a.nombre.localeCompare(b.nombre)],
+}
+const lista = computed(() => {
+  const q = busqueda.value.trim().toLowerCase()
+  return inv.insumos
+    .filter((i) => (!q || i.nombre.toLowerCase().includes(q)) && (!filtroUnidad.value || i.unidad_medida === filtroUnidad.value) && (!soloBajos.value || bajo(i)))
+    .sort(ordenes[orden.value][1])
+})
+
 const bajo = (i) => i.stock_almacen <= i.stock_minimo
 onMounted(cargar)
 </script>
@@ -119,7 +141,7 @@ onMounted(cargar)
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div><label class="label" for="c-costo">Costo total ($)</label><input id="c-costo" v-model.number="compra.costo_total" type="number" min="0" step="0.01" class="input" required /></div>
-        <div><label class="label" for="c-prov">Proveedor</label><input id="c-prov" v-model="compra.proveedor" class="input" required /></div>
+        <ProveedorSelect id="c-prov" v-model="compra.proveedor" />
       </div>
       <p v-if="seleccionado" class="text-sm text-uva bg-uva-claro rounded-lg px-3 py-2">
         Entran {{ num(cantidadBase) }} {{ seleccionado.unidad_medida }} · esta compra cuesta {{ money(costoUnit) }} por {{ seleccionado.unidad_medida }}
@@ -133,7 +155,7 @@ onMounted(cargar)
       <h2 class="text-xl font-bold">Compra de Boing surtido</h2>
       <div class="inline-flex rounded-lg bg-uva-claro p-1" role="group" aria-label="Tamaño de la caja">
         <button type="button" v-for="t in [250, 500]" :key="t" class="px-4 py-1.5 rounded-md font-bold"
-          :class="surtido.tamano === t ? 'bg-uva text-white' : 'text-uva'" @click="surtido.tamano = t">{{ t }} ml</button>
+          :class="surtido.tamano === t ? 'bg-uva text-white' : 'text-uva'" @click="surtido.tamano = t; surtido.cantidades = {}">{{ t }} ml</button>
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div v-for="s in sabores" :key="s">
@@ -147,7 +169,7 @@ onMounted(cargar)
       </p>
       <div class="grid grid-cols-2 gap-3">
         <div><label class="label" for="s-costo">Costo total ($)</label><input id="s-costo" v-model.number="surtido.costo_total" type="number" min="0" step="0.01" class="input" required /></div>
-        <div><label class="label" for="s-prov">Proveedor</label><input id="s-prov" v-model="surtido.proveedor" class="input" required /></div>
+        <ProveedorSelect id="s-prov" v-model="surtido.proveedor" />
       </div>
       <p class="text-xs text-tinta/60">El costo se reparte entre los sabores según las piezas de cada uno.</p>
       <button class="btn-primary" :disabled="!piezasSurtido">Guardar surtido</button>
@@ -157,10 +179,19 @@ onMounted(cargar)
   <!-- Almacén -->
   <section class="card overflow-x-auto mb-5">
     <h2 class="text-xl font-bold mb-2">Almacén central</h2>
+    <div class="grid sm:grid-cols-4 gap-3 mb-3">
+      <div><label class="label" for="f-q">Buscar</label><input id="f-q" v-model="busqueda" class="input" placeholder="Chamoy…" /></div>
+      <div><label class="label" for="f-o">Ordenar por</label>
+        <select id="f-o" v-model="orden" class="input"><option v-for="(o, k) in ordenes" :key="k" :value="k">{{ o[0] }}</option></select></div>
+      <div><label class="label" for="f-u">Tipo</label>
+        <select id="f-u" v-model="filtroUnidad" class="input"><option value="">Todos</option><option value="gr">Gramos (gr)</option><option value="ml">Mililitros (ml)</option><option value="pza">Piezas (pza)</option></select></div>
+      <label class="flex items-end gap-2 pb-2.5 cursor-pointer"><input type="checkbox" v-model="soloBajos" class="size-4 accent-uva" /><span>Solo por resurtir</span></label>
+    </div>
+    <p v-if="!lista.length" class="text-sm text-tinta/60">Ningún insumo coincide con el filtro.</p>
     <table class="w-full min-w-[44rem]">
       <thead><tr><th class="th">Insumo</th><th class="th text-right">Existencia</th><th class="th text-right">Mínimo</th><th class="th text-right">Presentación</th><th class="th text-right">Costo unitario</th><th class="th"></th></tr></thead>
       <tbody>
-        <tr v-for="i in inv.insumos" :key="i.id" :class="bajo(i) ? 'bg-chamoy-claro' : ''">
+        <tr v-for="i in lista" :key="i.id" :class="bajo(i) ? 'bg-chamoy-claro' : ''">
           <td class="td font-bold">{{ i.nombre }}<span v-if="bajo(i)" class="ml-2 text-xs text-chamoy">Resurtir</span></td>
           <td class="td text-right">{{ num(i.stock_almacen) }} {{ i.unidad_medida }}</td>
           <td class="td text-right">{{ num(i.stock_minimo) }}</td>

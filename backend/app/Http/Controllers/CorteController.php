@@ -3,54 +3,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Corte;
 use App\Models\FondoCaja;
-use App\Models\InventarioVendedor;
 use App\Models\Insumo;
+use App\Models\InventarioVendedor;
 use App\Models\Venta;
+use App\Services\Arqueo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class CorteController extends Controller
 {
-    /** Cálculo del arqueo del turno abierto (ventas sin corte + fondo de caja). */
-    private function arqueo(int $uid): array
-    {
-        $ventas = Venta::where('user_id', $uid)->whereNull('corte_id');
-
-        $porTamano = DB::table('ventas')->join('productos', 'productos.id', '=', 'ventas.producto_id')
-            ->where('ventas.user_id', $uid)->whereNull('ventas.corte_id')
-            ->select('productos.tamano', DB::raw('SUM(ventas.cantidad) as unidades'), DB::raw('SUM(ventas.total_venta) as total'))
-            ->groupBy('productos.tamano')->get()->keyBy('tamano');
-
-        $efectivo = (float) (clone $ventas)->where('metodo_pago', 'efectivo')->sum('total_venta');
-        $transferencia = (float) (clone $ventas)->where('metodo_pago', 'transferencia')->sum('total_venta');
-        $comision = (float) (clone $ventas)->sum('comision_generada');
-        $saldo = (float) (FondoCaja::where('user_id', $uid)->whereNull('corte_id')->value('monto') ?? 0);
-
-        $efectivoEnCaja = $saldo + $efectivo;
-        $entregar = $efectivoEnCaja - $comision; // con signo
-
-        return [
-            'saldo_inicial' => $saldo,
-            'unidades_250' => (int) ($porTamano->get(250)->unidades ?? 0),
-            'total_250' => (float) ($porTamano->get(250)->total ?? 0),
-            'unidades_500' => (int) ($porTamano->get(500)->unidades ?? 0),
-            'total_500' => (float) ($porTamano->get(500)->total ?? 0),
-            'unidades' => (int) (clone $ventas)->sum('cantidad'),
-            'total_efectivo' => $efectivo,
-            'total_transferencia' => $transferencia,
-            'total_vendido' => $efectivo + $transferencia,
-            'comision' => $comision,
-            'efectivo_en_caja' => $efectivoEnCaja,
-            'entregar' => $entregar,
-            'monto_entregar' => max(0, $entregar),   // el vendedor entrega al admin
-            'monto_recibir' => max(0, -$entregar),   // el admin le completa su ganancia
-        ];
-    }
-
+    /** Vista previa del arqueo: ventas sin cortar + sobrante en inventario. */
     public function preview(Request $r)
     {
         $uid = $r->user()->id;
-        $res = $this->arqueo($uid);
+        $res = Arqueo::paraVendedor($uid);
         $res['sobrante'] = InventarioVendedor::with('insumo:id,nombre,unidad_medida')
             ->where('user_id', $uid)->where('cantidad_asignada', '>', 0)->get();
         return $res;
@@ -64,12 +30,14 @@ class CorteController extends Controller
         $devolver = (bool) ($data['devolver_sobrante'] ?? false);
 
         return DB::transaction(function () use ($uid, $devolver) {
-            $a = $this->arqueo($uid);
+            $a = Arqueo::paraVendedor($uid);
             abort_if($a['unidades'] === 0 && $a['saldo_inicial'] <= 0, 422, 'No hay ventas ni fondo de caja pendientes de corte.');
 
             $corte = Corte::create([
                 'user_id' => $uid, 'unidades' => $a['unidades'],
                 'unidades_250' => $a['unidades_250'], 'unidades_500' => $a['unidades_500'],
+                'total_250' => $a['total_250'], 'total_500' => $a['total_500'],
+                'comision_250' => $a['comision_250'], 'comision_500' => $a['comision_500'],
                 'saldo_inicial' => $a['saldo_inicial'], 'total_efectivo' => $a['total_efectivo'],
                 'total_transferencia' => $a['total_transferencia'], 'comision' => $a['comision'],
                 'entregar' => $a['entregar'], 'sobrante_devuelto' => $devolver,
@@ -86,5 +54,18 @@ class CorteController extends Controller
             }
             return response()->json($corte, 201);
         });
+    }
+
+    /** Cortes cerrados del propio vendedor. */
+    public function historial(Request $r)
+    {
+        return Corte::where('user_id', $r->user()->id)->latest('id')->limit(30)->get()->map(fn ($c) => Arqueo::deCorte($c));
+    }
+
+    /** Cortes cerrados de todos los vendedores (admin). */
+    public function adminIndex()
+    {
+        return Corte::with('user:id,name')->latest('id')->limit(60)->get()
+            ->map(fn ($c) => Arqueo::deCorte($c) + ['vendedor' => $c->user->name]);
     }
 }

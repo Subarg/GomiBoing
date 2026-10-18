@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\EntradaAlmacen;
 use App\Models\Insumo;
 use App\Models\Producto;
+use App\Models\Proveedor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -42,6 +43,7 @@ class EntradaController extends Controller
             'fecha' => 'nullable|date',
         ]);
 
+        Proveedor::firstOrCreate(['nombre' => trim($data['proveedor'])]);
         $entrada = DB::transaction(fn () => $this->registrar(
             $data['insumo_id'], $data['cantidad_ingresada'], $data['costo_total'],
             $data['proveedor'], $data['fecha'] ?? now()->toDateString()
@@ -61,7 +63,7 @@ class EntradaController extends Controller
             'costo_total' => 'required|numeric|min:0',
             'fecha' => 'nullable|date',
             'sabores' => 'required|array|min:1',
-            'sabores.*.sabor' => 'required|string|exists:productos,sabor',
+            'sabores.*.sabor' => 'required|string',
             'sabores.*.cantidad' => 'required|integer|min:0',
         ]);
 
@@ -69,6 +71,13 @@ class EntradaController extends Controller
         abort_if($lineas->isEmpty(), 422, 'Captura al menos un sabor con piezas.');
 
         $ml = (int) $data['tamano'];
+        foreach ($lineas as $l) {
+            abort_unless(
+                Producto::where('activo', true)->where('sabor', $l['sabor'])->where('tamano', $ml)->exists(),
+                422, "El sabor {$l['sabor']} no está activo en {$ml} ml."
+            );
+        }
+        Proveedor::firstOrCreate(['nombre' => trim($data['proveedor'])]);
         $totalPzas = $lineas->sum('cantidad');
         $fecha = $data['fecha'] ?? now()->toDateString();
 
@@ -84,7 +93,7 @@ class EntradaController extends Controller
                     'unidad_medida' => 'pza', 'stock_minimo' => 12,
                     'presentacion' => 'Caja', 'presentacion_cantidad' => Insumo::cajaBoing($ml),
                 ]);
-                $out[] = $this->registrar($insumo->id, $l['cantidad'], $costo, $data['proveedor'] . ' (surtido)', $fecha);
+                $out[] = $this->registrar($insumo->id, $l['cantidad'], $costo, $data['proveedor'], $fecha);
             }
             return $out;
         });

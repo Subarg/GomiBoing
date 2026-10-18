@@ -54,3 +54,20 @@ Corre `php artisan migrate`: crea `fondos_caja`, agrega columnas a `cortes` y aj
 El servidor está corriendo una versión anterior del backend (o con rutas en caché). Ejecuta
 `./actualizar-backend.sh api-gomiboing`: copia los archivos, migra, limpia cachés y muestra las rutas nuevas
 (`fondos`, `entradas/surtido`, `recetas`). Si ya estás en Render, sube también los cambios de `api-gomiboing/` y vuelve a desplegar.
+
+## Notas de la versión 3
+
+- **Zona horaria:** define `APP_TIMEZONE=America/Mexico_City` en el `.env` (en Render ya va en el Dockerfile) para que "hoy" y las horas del panel sean las de México.
+- **Sesión:** los tokens de Sanctum no expiran. La app solo cierra la sesión si el servidor responde 401; un corte de red o un servidor dormido ya no la cierra.
+- **Sabor eliminado:** al eliminar un Boing, sus productos se desactivan (un producto sin Boing no se puede preparar). La migración desactiva los que ya hayan quedado así.
+- **Ventas eliminadas:** el vendedor puede eliminar ventas del turno abierto (los insumos regresan a su inventario) y el admin las ve en el panel.
+- Después de actualizar: `./actualizar-backend.sh api-gomiboing`.
+
+## Versión 4: aviso de backend desactualizado
+
+La app consulta `/api/estado` al iniciar sesión. Si el servidor es una versión anterior o le faltan migraciones, aparece una
+franja roja arriba con el motivo. Para corregirlo: copia `backend/` sobre tu proyecto Laravel, ejecuta
+`./actualizar-backend.sh api-gomiboing` y reinicia el servidor.
+
+Vendedores: el admin puede ver y editar correo y contraseña. Solo se muestran las contraseñas asignadas desde el panel
+(se guardan cifradas con `APP_KEY`); las cuentas anteriores aparecen como "no disponible" hasta asignarles una nueva.

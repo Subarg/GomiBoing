@@ -33,7 +33,8 @@ class ProductoController extends Controller
                     if ($cap < 1) $faltan[] = $i->nombre;
                     $max = min($max, $cap);
                 }
-                if ($p->insumos->isEmpty() || $max === PHP_INT_MAX) $max = 0;
+                $tieneBoing = $p->insumos->contains(fn ($i) => str_starts_with($i->nombre, 'Boing '));
+                if (!$tieneBoing || $max === PHP_INT_MAX) { $max = 0; $faltan[] = 'Boing'; }
 
                 return [
                     'id' => $p->id, 'nombre' => $p->nombre, 'sabor' => $p->sabor, 'tamano' => $p->tamano,
