@@ -5,10 +5,11 @@ databases:
     databaseName: gomiboing
 
 services:
+  # BACKEND LARAVEL (API)
   - type: web
     name: gomiboing-api
     runtime: docker
-    rootDir: api-gomiboing
+    rootDir: backend
     plan: free
     healthCheckPath: /up
     envVars:
@@ -17,7 +18,7 @@ services:
       - key: APP_DEBUG
         value: "false"
       - key: APP_KEY
-        sync: false          # genera con: php artisan key:generate --show
+        sync: false          # Generar con: php artisan key:generate --show
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_URL
@@ -27,15 +28,16 @@ services:
       - key: SESSION_DRIVER
         value: array
       - key: FRONTEND_URL
-        sync: false          # URL del Static Site, ej. https://gomiboing.onrender.com
+        sync: false          # Ej: https://gomiboing-web.onrender.com
       - key: SEED_ADMIN_PASSWORD
         sync: false
       - key: SEED_VENDEDOR_PASSWORD
         sync: false
 
+  # FRONTEND VUE.JS
   - type: web
     name: gomiboing-web
-    runtime: static
+    env: static
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
@@ -45,4 +47,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        sync: false          # ej. https://gomiboing-api.onrender.com/api
+        sync: false          # Ej: https://gomiboing-api.onrender.com/api
