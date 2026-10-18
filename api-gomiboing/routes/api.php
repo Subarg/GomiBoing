@@ -18,6 +18,15 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
+Route::get('/forzar-migracion', function () {
+    try {
+        Artisan::call('migrate', ['--force' => true]);
+        return '<pre>Resultado de migración:\n' . Artisan::output() . '</pre>';
+    } catch (\Exception $e) {
+        return '<pre>ERROR SQL:\n' . $e->getMessage() . '</pre>';
+    }
+});
+
 Route::get('/limpieza-profunda', function () {
     try {
         $output = '';
