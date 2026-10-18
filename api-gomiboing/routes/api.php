@@ -14,8 +14,16 @@ use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\RecetaController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VentaController;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+
+Route::get('/configurar-bd', function () {
+    Artisan::call('migrate', ['--force' => true]);
+    Artisan::call('optimize:clear');
+
+    return '¡Migraciones ejecutadas y caché limpia con éxito!';
+})->middleware(['auth:sanctum', 'role:admin']);
 
 // Diagnóstico: versión del backend y migraciones que faltan (lo usa la app para avisar si el servidor está desactualizado)
 Route::get('/estado', function () {
