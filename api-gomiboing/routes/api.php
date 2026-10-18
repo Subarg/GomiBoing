@@ -18,12 +18,22 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
-Route::get('/forzar-migracion', function () {
+Route::get('/limpieza-profunda', function () {
     try {
-        Artisan::call('migrate', ['--force' => true]);
-        return '<pre>Resultado de migración:\n' . Artisan::output() . '</pre>';
+        $output = '';
+        
+        // 1. Limpia toda la caché guardada
+        Artisan::call('optimize:clear');
+        $output .= "Caché limpia.\n";
+        
+        // 2. Refresca la caché de rutas y configuración
+        Artisan::call('config:cache');
+        Artisan::call('route:cache');
+        $output .= "Configuración y rutas cacheadas.\n";
+
+        return '<pre>Limpieza completada:\n' . $output . '</pre>';
     } catch (\Exception $e) {
-        return '<pre>ERROR SQL:\n' . $e->getMessage() . '</pre>';
+        return '<pre>ERROR:\n' . $e->getMessage() . '</pre>';
     }
 });
 
