@@ -23,7 +23,7 @@ Route::get('/configurar-bd', function () {
     Artisan::call('optimize:clear');
 
     return '¡Migraciones ejecutadas y caché limpia con éxito!';
-})->middleware(['auth:sanctum', 'role:admin']);
+});
 
 // Diagnóstico: versión del backend y migraciones que faltan (lo usa la app para avisar si el servidor está desactualizado)
 Route::get('/estado', function () {
