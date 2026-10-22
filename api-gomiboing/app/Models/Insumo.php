@@ -13,6 +13,11 @@ class Insumo extends Model
         'costo_unitario' => 'float', 'presentacion_cantidad' => 'float',
     ];
 
+    public static function esBoing(string $nombre): bool
+    {
+        return str_starts_with($nombre, 'Boing ');
+    }
+
     /** Piezas por caja de Boing: 250ml trae 27, 500ml trae 24. */
     public static function cajaBoing(int $ml): int
     {

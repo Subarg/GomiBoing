@@ -11,7 +11,8 @@ const aviso = ref('')
 
 const masivo = ref({ accion: 'agregar', insumo_id: '', nuevo_insumo_id: '', cantidad: 1, tamano: '' })
 
-const insumosOrdenados = computed(() => [...inv.insumos].sort((a, b) => a.nombre.localeCompare(b.nombre)))
+// El Boing no va en la receta: se asigna por sabor y tamaño en "Sabores y precios"
+const insumosOrdenados = computed(() => [...inv.insumosReceta].sort((a, b) => a.nombre.localeCompare(b.nombre)))
 const unidad = (id) => inv.insumos.find((i) => i.id === id)?.unidad_medida ?? ''
 
 async function cargar() {
@@ -59,16 +60,14 @@ async function aplicarMasivo() {
   } catch (e) { fallo(e) }
 }
 
+// ---- Receta vigente: insumos (filas) x productos activos (columnas)
 const activas = computed(() => guardadas.value.filter((p) => p.activo))
-// Matriz: insumos (filas) x productos (columnas) con la receta vigente
 const filas = computed(() => {
   const mapa = new Map()
   for (const p of activas.value) {
     for (const l of p.receta) {
-      const esBoing = l.nombre.startsWith('Boing ')
-      const key = esBoing ? 'boing' : l.insumo_id
-      if (!mapa.has(key)) mapa.set(key, { key, nombre: esBoing ? 'Boing del sabor y tamaño' : l.nombre, unidad: l.unidad_medida, valores: {} })
-      mapa.get(key).valores[p.id] = l.cantidad
+      if (!mapa.has(l.insumo_id)) mapa.set(l.insumo_id, { key: l.insumo_id, nombre: l.nombre, unidad: l.unidad_medida, valores: {} })
+      mapa.get(l.insumo_id).valores[p.id] = l.cantidad
     }
   }
   return [...mapa.values()].sort((a, b) => a.nombre.localeCompare(b.nombre))
@@ -83,9 +82,41 @@ onMounted(cargar)
   <p v-if="error" class="text-chamoy font-bold mb-3" role="alert">{{ error }}</p>
   <p v-if="aviso" class="text-green-700 font-bold mb-3" role="status">{{ aviso }}</p>
 
+  <p class="text-sm text-tinta/70 mb-4">
+    La receta lista lo que se descuenta por vaso y es compartido entre sabores (gomitas, chamoy, tajín…).
+    Cada producto lleva además <b>su propio Boing</b> (1 pza), que se asigna en «Sabores y precios».
+  </p>
+
+  <section class="card overflow-x-auto mb-5">
+    <h2 class="text-xl font-bold mb-1">Receta actual</h2>
+    <p class="text-sm text-tinta/70 mb-3">Un guion significa que ese insumo no se usa en ese producto.</p>
+    <table class="w-full min-w-[40rem] text-sm">
+      <thead>
+        <tr>
+          <th class="th">Insumo</th>
+          <th v-for="p in activas" :key="p.id" class="th text-right whitespace-nowrap">{{ p.sabor }} {{ p.tamano }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="f in filas" :key="f.key">
+          <td class="td font-bold">{{ f.nombre }} <span class="font-normal text-tinta/60">({{ f.unidad }})</span></td>
+          <td v-for="p in activas" :key="p.id" class="td text-right" :class="f.valores[p.id] ? '' : 'text-tinta/30'">
+            {{ f.valores[p.id] ? num(f.valores[p.id]) : '—' }}
+          </td>
+        </tr>
+        <tr class="bg-uva-claro/50">
+          <td class="td font-bold">Boing propio (pza)</td>
+          <td v-for="p in activas" :key="p.id" class="td text-right" :class="p.boing ? '' : 'text-chamoy font-bold'">
+            {{ p.boing ? '1' : 'Sin Boing' }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
   <form class="card space-y-3 mb-5" @submit.prevent="aplicarMasivo">
     <h2 class="text-xl font-bold">Cambio para ocasiones especiales</h2>
-    <p class="text-sm text-tinta/70">Agrega unas gomitas especiales (tiburón, araña), retira los palitos de tamarindo o cambia un insumo por otro en varias recetas a la vez.</p>
+    <p class="text-sm text-tinta/70">Agrega unas gomitas especiales (tiburón, araña), retira los palitos de tamarindo o cambia un insumo por otro en varias recetas a la vez. No toca los Boing.</p>
     <div class="grid sm:grid-cols-4 gap-3">
       <div>
         <label class="label" for="m-a">Acción</label>
@@ -125,36 +156,19 @@ onMounted(cargar)
     <button class="btn-primary">Aplicar cambio</button>
   </form>
 
-  <section class="card overflow-x-auto mb-5">
-    <h2 class="text-xl font-bold mb-1">Receta actual</h2>
-    <p class="text-sm text-tinta/70 mb-3">Cuánto se descuenta por vaso, según lo guardado. Un guion significa que ese insumo no se usa.</p>
-    <table class="w-full min-w-[40rem] text-sm">
-      <thead>
-        <tr>
-          <th class="th">Insumo</th>
-          <th v-for="p in activas" :key="p.id" class="th text-right whitespace-nowrap">{{ p.sabor }} {{ p.tamano }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="f in filas" :key="f.key">
-          <td class="td font-bold">{{ f.nombre }} <span class="font-normal text-tinta/60">({{ f.unidad }})</span></td>
-          <td v-for="p in activas" :key="p.id" class="td text-right" :class="f.valores[p.id] ? '' : 'text-tinta/30'">
-            {{ f.valores[p.id] ? num(f.valores[p.id]) : '—' }}
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
-
   <h2 class="text-xl font-bold mb-2">Editar por producto</h2>
   <section class="space-y-3">
-    <details v-for="p in productos" :key="p.id" class="card group">
+    <details v-for="p in productos" :key="p.id" class="card">
       <summary class="cursor-pointer font-display text-lg font-bold flex justify-between gap-2">
         <span>{{ p.nombre }}<span v-if="!p.activo" class="ml-2 text-xs text-chamoy font-sans font-normal">Inactivo</span></span>
         <span class="text-sm font-sans font-normal text-tinta/60">{{ p.sucio ? 'Sin guardar' : `${p.receta.length} insumos` }}</span>
       </summary>
 
-      <p class="text-xs text-tinta/60 mt-2">Guardada: {{ resumen(p.id) }}</p>
+      <p class="text-xs text-tinta/60 mt-2">Guardada: {{ resumen(p.id) || 'sin insumos' }}</p>
+      <p class="text-sm mt-2 rounded-lg px-3 py-1.5" :class="p.boing ? 'bg-uva-claro text-uva' : 'bg-chamoy-claro text-chamoy font-bold'">
+        {{ p.boing ? `Boing propio: ${p.boing.nombre} · 1 pza por vaso` : 'Este producto no tiene Boing asignado. Asígnalo en «Sabores y precios».' }}
+      </p>
+
       <div class="mt-3 space-y-2">
         <div v-for="(l, idx) in p.receta" :key="idx" class="grid grid-cols-[1fr_7rem_auto] gap-2 items-end">
           <div>

@@ -50,6 +50,7 @@ class DatabaseSeeder extends Seeder
 
                 $producto = Producto::firstOrCreate(['nombre' => "Gomiboing $sabor {$ml}ml"], [
                     'sabor' => $sabor, 'tamano' => $ml, 'precio_venta' => $cfg['precio'], 'comision' => $cfg['comision'], 'activo' => true,
+                    'boing_insumo_id' => $boing->id, // su Boing: 1 pza por vaso, fuera de la receta
                 ]);
 
                 $receta = [
@@ -58,7 +59,6 @@ class DatabaseSeeder extends Seeder
                     $insumos['Chamoy']->id => 30,
                     $insumos['Tajín']->id => 1.6,
                     $insumos[Insumo::CUCHARA]->id => 1,
-                    $boing->id => 1,
                 ];
                 if ($sabor === 'Mango') {
                     $receta[$insumos['Gomita de Mango']->id] = $cfg['mango'];

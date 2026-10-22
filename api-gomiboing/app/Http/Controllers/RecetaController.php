@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\Insumo;
 use App\Models\Producto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,19 +13,32 @@ class RecetaController extends Controller
         return [
             'id' => $p->id, 'nombre' => $p->nombre, 'sabor' => $p->sabor, 'tamano' => $p->tamano,
             'activo' => (bool) $p->activo, 'precio_venta' => $p->precio_venta, 'comision' => $p->comision,
-            'receta' => $p->insumos->map(fn ($i) => [
+            // El Boing es propio de cada producto (1 pza por vaso) y no se edita como renglón de la receta
+            'boing' => $p->boing ? [
+                'insumo_id' => $p->boing->id, 'nombre' => $p->boing->nombre, 'stock_almacen' => $p->boing->stock_almacen,
+            ] : null,
+            'receta' => $p->insumos->reject(fn ($i) => Insumo::esBoing($i->nombre))->map(fn ($i) => [
                 'insumo_id' => $i->id, 'nombre' => $i->nombre, 'unidad_medida' => $i->unidad_medida,
                 'cantidad' => (float) $i->pivot->cantidad_requerida,
             ])->sortBy('nombre')->values(),
         ];
     }
 
-    public function index()
+    private function rechazarBoing(array $ids): void
     {
-        return Producto::with('insumos')->orderBy('tamano')->orderBy('sabor')->get()->map(fn ($p) => $this->formato($p));
+        $nombres = Insumo::whereIn('id', array_filter($ids))->pluck('nombre');
+        abort_if(
+            $nombres->contains(fn ($n) => Insumo::esBoing($n)), 422,
+            'El Boing se asigna por sabor y tamaño en "Sabores y precios"; no va en la receta.'
+        );
     }
 
-    /** Reemplaza la receta completa de un producto. */
+    public function index()
+    {
+        return Producto::with(['insumos', 'boing'])->orderBy('tamano')->orderBy('sabor')->get()->map(fn ($p) => $this->formato($p));
+    }
+
+    /** Reemplaza la receta (sin Boing) de un producto. */
     public function update(Request $r, Producto $producto)
     {
         $data = $r->validate([
@@ -32,17 +46,18 @@ class RecetaController extends Controller
             'items.*.insumo_id' => 'required|exists:insumos,id|distinct',
             'items.*.cantidad' => 'required|numeric|min:0.0001',
         ]);
+        $this->rechazarBoing(array_column($data['items'], 'insumo_id'));
 
         $producto->insumos()->sync(
             collect($data['items'])->mapWithKeys(fn ($i) => [$i['insumo_id'] => ['cantidad_requerida' => $i['cantidad']]])->all()
         );
-        return $this->formato($producto->load('insumos'));
+        return $this->formato($producto->load(['insumos', 'boing']));
     }
 
     /**
-     * Cambios en bloque para ocasiones especiales:
-     *  - agregar: agrega (o actualiza la cantidad de) un insumo en las recetas
-     *  - quitar: retira un insumo de las recetas (ej. palitos de tamarindo)
+     * Cambios en bloque para ocasiones especiales (nunca tocan el Boing):
+     *  - agregar: agrega (o actualiza la cantidad de) un insumo
+     *  - quitar: retira un insumo (ej. palitos de tamarindo)
      *  - reemplazar: cambia un insumo por otro (ej. gomitas normales por tiburón)
      */
     public function masivo(Request $r)
@@ -54,6 +69,7 @@ class RecetaController extends Controller
             'cantidad' => 'required_if:accion,agregar|nullable|numeric|min:0.0001',
             'tamano' => 'nullable|in:250,500',
         ]);
+        $this->rechazarBoing([$data['insumo_id'], $data['nuevo_insumo_id'] ?? null]);
 
         $afectados = DB::transaction(function () use ($data) {
             $productos = Producto::with('insumos')->when($data['tamano'] ?? null, fn ($q, $t) => $q->where('tamano', $t))->get();

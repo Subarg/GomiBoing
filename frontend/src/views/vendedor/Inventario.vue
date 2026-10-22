@@ -2,9 +2,11 @@
 import { onMounted, ref } from 'vue'
 import { useInventoryStore } from '../../stores/inventory'
 import api, { mensajeError, num } from '../../api'
+import CapacidadLote from '../../components/CapacidadLote.vue'
 
 const inv = useInventoryStore()
 const mermas = ref([])
+const capacidad = ref(null)
 const form = ref({ insumo_id: '', cantidad: 1, motivo: '' })
 const error = ref('')
 const aviso = ref('')
@@ -12,6 +14,7 @@ const aviso = ref('')
 async function cargar() {
   await inv.fetchMiInventario()
   mermas.value = (await api.get('/vendedor/mermas')).data
+  try { capacidad.value = (await api.get('/vendedor/capacidad')).data } catch { capacidad.value = null }
 }
 
 async function registrar() {
@@ -42,9 +45,14 @@ onMounted(cargar)
           </tr>
         </tbody>
       </table>
+
+      <div v-if="capacidad" class="mt-4 pt-4 border-t border-uva/15">
+        <h3 class="font-bold mb-2">¿Cuánto puedo vender?</h3>
+        <CapacidadLote :c="capacidad" />
+      </div>
     </section>
 
-    <section class="card">
+    <section class="card h-fit">
       <h2 class="text-xl font-bold mb-2">Registrar merma</h2>
       <form class="space-y-3" @submit.prevent="registrar">
         <div>

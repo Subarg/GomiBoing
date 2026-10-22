@@ -50,9 +50,7 @@ class InsumoController extends Controller
         );
         DB::transaction(function () use ($insumo) {
             // Un producto sin su Boing no se puede preparar: se desactiva (ej. un sabor que ya no manejas)
-            if (str_starts_with($insumo->nombre, 'Boing ')) {
-                Producto::whereIn('id', DB::table('recetas')->where('insumo_id', $insumo->id)->pluck('producto_id'))->update(['activo' => false]);
-            }
+            Producto::where('boing_insumo_id', $insumo->id)->update(['activo' => false, 'boing_insumo_id' => null]);
             Merma::where('insumo_id', $insumo->id)->delete();
             $insumo->delete(); // recetas, compras e inventario vacío se eliminan en cascada
         });

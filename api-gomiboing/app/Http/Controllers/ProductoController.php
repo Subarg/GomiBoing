@@ -1,8 +1,11 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\Insumo;
 use App\Models\InventarioVendedor;
 use App\Models\Producto;
+use App\Models\User;
+use App\Services\Disponibilidad;
 use Illuminate\Http\Request;
 
 class ProductoController extends Controller
@@ -14,33 +17,46 @@ class ProductoController extends Controller
     }
 
     /**
-     * Para el POS: todos los productos activos con las piezas que el vendedor puede preparar
-     * con su lote (`disponible`) y los insumos que le faltan (`faltan`).
-     * El POS solo muestra los que tienen disponible >= 1 y usa `faltan` para explicar por qué no puede vender.
+     * Datos para el POS: productos con las líneas de su receta (insumos compartidos + su Boing),
+     * el stock del vendedor y los nombres de los insumos. El POS calcula en vivo lo que alcanza
+     * descontando lo que ya está en la cuenta.
      */
     public function disponibles(Request $r)
     {
-        $stock = InventarioVendedor::where('user_id', $r->user()->id)->pluck('cantidad_asignada', 'insumo_id');
+        $uid = $r->user()->id;
+        $stock = Disponibilidad::stockDe($uid);
+        $nombres = Insumo::pluck('nombre', 'id')->all();
 
-        return Producto::with('insumos')->where('activo', true)->orderBy('tamano')->orderBy('sabor')->get()
-            ->map(function ($p) use ($stock) {
-                $max = PHP_INT_MAX;
-                $faltan = [];
-                foreach ($p->insumos as $i) {
-                    $req = (float) $i->pivot->cantidad_requerida;
-                    if ($req <= 0) continue;
-                    $cap = (int) floor((($stock[$i->id] ?? 0) + 0.00001) / $req);
-                    if ($cap < 1) $faltan[] = $i->nombre;
-                    $max = min($max, $cap);
-                }
-                $tieneBoing = $p->insumos->contains(fn ($i) => str_starts_with($i->nombre, 'Boing '));
-                if (!$tieneBoing || $max === PHP_INT_MAX) { $max = 0; $faltan[] = 'Boing'; }
-
+        $productos = Producto::with('insumos')->where('activo', true)->orderBy('tamano')->orderBy('sabor')->get()
+            ->map(function ($p) use ($stock, $nombres) {
+                $l = Disponibilidad::lineas($p);
                 return [
                     'id' => $p->id, 'nombre' => $p->nombre, 'sabor' => $p->sabor, 'tamano' => $p->tamano,
                     'precio_venta' => $p->precio_venta, 'comision' => $p->comision,
-                    'disponible' => $max, 'faltan' => $faltan,
+                    'boing_insumo_id' => $p->boing_insumo_id ? (int) $p->boing_insumo_id : null,
+                    'lineas' => collect($l)->map(fn ($c, $id) => ['insumo_id' => (int) $id, 'cantidad' => $c])->values(),
+                    'disponible' => Disponibilidad::capacidad($l, $stock),
+                    'faltan' => Disponibilidad::faltan($l, $stock, $nombres),
                 ];
             })->values();
+
+        return [
+            'productos' => $productos,
+            'cuchara_insumo_id' => Insumo::where('nombre', Insumo::CUCHARA)->value('id'),
+            'stock' => collect($stock)->map(fn ($c, $id) => ['insumo_id' => (int) $id, 'cantidad' => $c])->values(),
+            'insumos' => Insumo::get(['id', 'nombre', 'unidad_medida']),
+        ];
+    }
+
+    /** Capacidad del lote del propio vendedor. */
+    public function capacidad(Request $r)
+    {
+        return Disponibilidad::resumen($r->user()->id);
+    }
+
+    /** Capacidad del lote de un vendedor (admin). */
+    public function capacidadVendedor(User $user)
+    {
+        return Disponibilidad::resumen($user->id);
     }
 }

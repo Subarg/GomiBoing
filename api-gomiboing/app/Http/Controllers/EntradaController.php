@@ -93,6 +93,8 @@ class EntradaController extends Controller
                     'unidad_medida' => 'pza', 'stock_minimo' => 12,
                     'presentacion' => 'Caja', 'presentacion_cantidad' => Insumo::cajaBoing($ml),
                 ]);
+                Producto::where('sabor', $l['sabor'])->where('tamano', $ml)->whereNull('boing_insumo_id')
+                    ->update(['boing_insumo_id' => $insumo->id]);
                 $out[] = $this->registrar($insumo->id, $l['cantidad'], $costo, $data['proveedor'], $fecha);
             }
             return $out;

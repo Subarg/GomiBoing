@@ -73,4 +73,3 @@ class Arqueo
         ];
     }
 }
-//Para render

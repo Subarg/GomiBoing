@@ -3,7 +3,7 @@
 Laravel 11/12 + Sanctum (API) · Vue 3 + Pinia + Tailwind (SPA) · PostgreSQL/MySQL · Render.
 
 ```
-backend/    archivos que se superponen a un Laravel nuevo (migraciones, modelos, controladores, rutas, seeder, Dockerfile)
+api-gomiboing/  archivos propios del proyecto, con las mismas rutas que tu Laravel: se descomprimen ENCIMA de tu carpeta api-gomiboing
 frontend/   SPA completa (Vite)
 render.yaml Blueprint de despliegue
 ```
@@ -11,7 +11,6 @@ render.yaml Blueprint de despliegue
 ## Desarrollo local
 
 ```bash
-./setup-backend.sh                         # crea api-gomiboing/ con Laravel + estos archivos
 cd api-gomiboing                           # configura DB_* en .env
 php artisan migrate --seed && php artisan serve
 
@@ -71,3 +70,18 @@ franja roja arriba con el motivo. Para corregirlo: copia `backend/` sobre tu pro
 
 Vendedores: el admin puede ver y editar correo y contraseña. Solo se muestran las contraseñas asignadas desde el panel
 (se guardan cifradas con `APP_KEY`); las cuentas anteriores aparecen como "no disponible" hasta asignarles una nueva.
+
+## Versión 5: recetas rehechas
+
+- Cada producto tiene su **Boing propio** (columna `productos.boing_insumo_id`, 1 pza por vaso). El Boing ya no es un renglón de la receta,
+  así que ningún cambio de receta (ni uno en bloque) puede mezclar Boing de otros sabores. La migración limpia los Boing que hubiera en recetas.
+- `App\Services\Disponibilidad` es la única regla de "qué se puede preparar": la usan el POS, las ventas, las eliminaciones y la capacidad del lote.
+- El POS descuenta en vivo lo que ya está en la cuenta y, si falta un insumo compartido (gomitas, chamoy, tajín…), muestra el sabor bloqueado con el motivo.
+- Asignar turno y Mi inventario muestran la **capacidad del lote**: cuántos vasos alcanzan y qué insumo limita.
+- Después de actualizar: `./actualizar-backend.sh api-gomiboing` y, en Sabores y precios, el botón «Reparar Boing de las recetas» si algún producto aparece sin Boing.
+
+## Cómo actualizar (sin scripts)
+
+1. Descomprime el ZIP **sobre** tu carpeta del proyecto, de modo que `api-gomiboing/` se fusione con la tuya (acepta reemplazar archivos). Solo trae archivos propios: no incluye `vendor/` ni `.env`.
+2. En `api-gomiboing/`: `composer dump-autoload && php artisan migrate && php artisan optimize:clear`
+3. Reinicia el servidor. Si algo quedó desactualizado, la app muestra una franja roja arriba.

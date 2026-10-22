@@ -5,6 +5,7 @@ use App\Models\Insumo;
 use App\Models\InventarioVendedor;
 use App\Models\Producto;
 use App\Models\Venta;
+use App\Services\Disponibilidad;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -35,16 +36,18 @@ class VentaController extends Controller
 
             foreach ($data['items'] as $it) {
                 $producto = Producto::with('insumos')->where('activo', true)->findOrFail($it['producto_id']);
+                // Insumos de la receta + SU Boing (1 pza); cualquier Boing ajeno en la receta se ignora
+                $lineas = Disponibilidad::lineas($producto);
                 abort_unless(
-                    $producto->insumos->contains(fn ($i) => str_starts_with($i->nombre, 'Boing ')),
-                    422, "{$producto->nombre} no tiene su Boing en la receta. Avisa al administrador."
+                    $producto->boing_insumo_id && isset($lineas[(int) $producto->boing_insumo_id]),
+                    422, "{$producto->nombre} no tiene su Boing asignado. Avisa al administrador."
                 );
                 $qty = (int) $it['cantidad'];
                 $extra = (int) ($it['cucharas_extra'] ?? 0);
 
                 $requerido = [];
-                foreach ($producto->insumos as $insumo) {
-                    $requerido[$insumo->id] = ($requerido[$insumo->id] ?? 0) + $insumo->pivot->cantidad_requerida * $qty;
+                foreach ($lineas as $insumoId => $req) {
+                    $requerido[$insumoId] = ($requerido[$insumoId] ?? 0) + $req * $qty;
                 }
                 if ($extra > 0 && $cucharaId) {
                     $requerido[$cucharaId] = ($requerido[$cucharaId] ?? 0) + $extra;
@@ -95,8 +98,8 @@ class VentaController extends Controller
 
             if (!$devolver) { // ventas anteriores sin registro: se reconstruye con la receta actual
                 $venta->load('producto.insumos');
-                foreach ($venta->producto->insumos as $i) {
-                    $devolver[$i->id] = $i->pivot->cantidad_requerida * $venta->cantidad;
+                foreach (Disponibilidad::lineas($venta->producto) as $insumoId => $req) {
+                    $devolver[$insumoId] = $req * $venta->cantidad;
                 }
                 if ($venta->cucharas_extra > 0 && ($c = Insumo::where('nombre', Insumo::CUCHARA)->value('id'))) {
                     $devolver[$c] = ($devolver[$c] ?? 0) + $venta->cucharas_extra;

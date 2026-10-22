@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useInventoryStore } from '../../stores/inventory'
 import api, { mensajeError, money, num } from '../../api'
+import CapacidadLote from '../../components/CapacidadLote.vue'
 
 const inv = useInventoryStore()
 const vendedores = ref([])
@@ -9,6 +10,7 @@ const userId = ref('')
 const lote = ref([])        // inventario actual del vendedor
 const lineas = ref([{ insumo_id: '', cantidad: 0 }])
 const fondo = ref(0)
+const capacidad = ref(null)
 const fondoActual = ref(null) // fondo ya guardado para el vendedor elegido
 const error = ref('')
 const aviso = ref('')
@@ -23,11 +25,13 @@ const unidad = (id) => inv.insumos.find((i) => i.id === id)?.unidad_medida ?? ''
 const existencia = (id) => inv.insumos.find((i) => i.id === id)?.stock_almacen ?? 0
 
 async function cargarVendedor() {
-  if (!userId.value) { lote.value = []; fondo.value = 0; fondoActual.value = null; return }
-  const [l, f] = await Promise.allSettled([
+  if (!userId.value) { lote.value = []; fondo.value = 0; fondoActual.value = null; capacidad.value = null; return }
+  const [l, f, c] = await Promise.allSettled([
     api.get(`/admin/vendedores/${userId.value}/inventario`),
     api.get(`/admin/vendedores/${userId.value}/fondo`),
+    api.get(`/admin/vendedores/${userId.value}/capacidad`),
   ])
+  capacidad.value = c.status === 'fulfilled' ? c.value.data : null
   if (l.status === 'fulfilled') lote.value = l.value.data
   else { lote.value = []; error.value = mensajeError(l.reason) }
   if (f.status === 'fulfilled') { fondo.value = f.value.data.monto; fondoActual.value = f.value.data.monto }
@@ -139,6 +143,11 @@ onMounted(async () => {
           </tr>
         </tbody>
       </table>
+    </section>
+
+    <section v-if="capacidad" class="card h-fit lg:col-start-2">
+      <h2 class="text-xl font-bold mb-2">Capacidad del lote</h2>
+      <CapacidadLote :c="capacidad" />
     </section>
   </div>
 </template>

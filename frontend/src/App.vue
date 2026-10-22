@@ -4,7 +4,7 @@ import { useAuthStore } from './stores/auth'
 import api from './api'
 import NavBar from './components/NavBar.vue'
 
-const VERSION_ESPERADA = 4
+const VERSION_ESPERADA = 5
 const auth = useAuthStore()
 const aviso = ref('')
 

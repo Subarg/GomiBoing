@@ -3,15 +3,18 @@ import { computed, onMounted, ref } from 'vue'
 import api, { mensajeError } from '../../api'
 
 const productos = ref([])
+const insumos = ref([])
 const error = ref('')
 const aviso = ref('')
 const nuevo = ref({ sabor: '', base_sabor: '', tamanos: [250, 500], precio_250: null, comision_250: null, precio_500: null, comision_500: null })
 
+const boings = computed(() => insumos.value.filter((i) => i.nombre.startsWith('Boing ')).sort((a, b) => a.nombre.localeCompare(b.nombre)))
 const saboresBase = computed(() => [...new Set([...productos.value].sort((a, b) => Number(b.activo) - Number(a.activo)).map((p) => p.sabor))])
 const ok = (m) => { error.value = ''; aviso.value = m }
 const fallo = (e) => { aviso.value = ''; error.value = mensajeError(e) }
 
 async function cargar() {
+  insumos.value = (await api.get('/admin/insumos')).data
   productos.value = (await api.get('/admin/recetas')).data.map((p) => ({ ...p, activo: p.activo ?? true }))
   if (!nuevo.value.base_sabor && saboresBase.value.length) nuevo.value.base_sabor = saboresBase.value[0]
 }
@@ -26,10 +29,18 @@ async function crear() {
 }
 
 async function reparar() {
-  if (!confirm('Esto quita de cada receta los Boing que no sean de su sabor y tamaño, y agrega el propio si falta. ¿Continuar?')) return
+  if (!confirm('Esto quita cualquier Boing que haya quedado dentro de las recetas y asigna a cada producto su Boing propio si le falta. ¿Continuar?')) return
   try {
     const { data } = await api.post('/admin/recetas/reparar')
-    ok(`Recetas revisadas: ${data.quitados} Boing ajenos quitados, ${data.agregados} propios agregados.`)
+    ok(`Recetas revisadas: ${data.quitados} Boing quitados de recetas, ${data.asignados} Boing propios asignados.`)
+    await cargar()
+  } catch (e) { fallo(e) }
+}
+
+async function asignarBoing(p) {
+  try {
+    await api.patch(`/admin/productos/${p.id}`, { boing_insumo_id: p.boing?.insumo_id || null })
+    ok(`Boing de ${p.nombre} actualizado.`)
     await cargar()
   } catch (e) { fallo(e) }
 }
@@ -90,11 +101,18 @@ onMounted(cargar)
       <h2 class="text-xl font-bold">Productos</h2>
       <button class="btn-ghost text-sm" @click="reparar">Reparar Boing de las recetas</button>
     </div>
-    <table class="w-full min-w-[40rem]">
-      <thead><tr><th class="th">Producto</th><th class="th">Precio</th><th class="th">Ganancia vendedor</th><th class="th"></th></tr></thead>
+    <table class="w-full min-w-[52rem]">
+      <thead><tr><th class="th">Producto</th><th class="th">Boing propio</th><th class="th">Precio</th><th class="th">Ganancia vendedor</th><th class="th"></th></tr></thead>
       <tbody>
         <tr v-for="p in productos" :key="p.id" :class="p.activo ? '' : 'opacity-60'">
           <td class="td font-bold">{{ p.nombre }}<span v-if="!p.activo" class="ml-2 text-xs text-chamoy">Inactivo</span></td>
+          <td class="td">
+            <select :value="p.boing?.insumo_id ?? ''" class="input !py-1 !w-48" :aria-label="`Boing de ${p.nombre}`"
+              @change="p.boing = $event.target.value ? { insumo_id: Number($event.target.value) } : null; asignarBoing(p)">
+              <option value="">Sin Boing</option>
+              <option v-for="b in boings" :key="b.id" :value="b.id">{{ b.nombre }}</option>
+            </select>
+          </td>
           <td class="td"><input v-model.number="p.precio_venta" type="number" min="0" step="0.01" class="input !w-24 !py-1" :aria-label="`Precio de ${p.nombre}`" @change="guardar(p)" /></td>
           <td class="td"><input v-model.number="p.comision" type="number" min="0" step="0.01" class="input !w-24 !py-1" :aria-label="`Ganancia de ${p.nombre}`" @change="guardar(p)" /></td>
           <td class="td text-right whitespace-nowrap">
@@ -104,6 +122,6 @@ onMounted(cargar)
         </tr>
       </tbody>
     </table>
-    <p class="text-xs text-tinta/60 mt-2">Desactivar oculta el producto en el POS sin perder su historial.</p>
+    <p class="text-xs text-tinta/60 mt-2">Cada producto descuenta 1 pza de su Boing por vaso. Desactivar oculta el producto en el POS sin perder su historial.</p>
   </section>
 </template>

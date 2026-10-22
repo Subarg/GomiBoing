@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import api from '../api'
 
+// El POS decide qué se puede agregar según el stock; aquí solo se guarda la cuenta.
 export const useCartStore = defineStore('cart', {
   state: () => ({ items: [], metodoPago: null }),
   getters: {
@@ -8,24 +9,16 @@ export const useCartStore = defineStore('cart', {
     total: (s) => s.items.reduce((a, i) => a + i.producto.precio_venta * i.cantidad, 0),
     comision: (s) => s.items.reduce((a, i) => a + i.producto.comision * i.cantidad, 0),
     listo: (s) => s.items.length > 0 && !!s.metodoPago,
-    enCarrito: (s) => (id) => s.items.find((i) => i.producto.id === id)?.cantidad ?? 0,
   },
   actions: {
-    /** Agrega una pieza sin pasar de lo que el vendedor tiene disponible. Devuelve false si ya no hay. */
     agregar(producto) {
       const linea = this.items.find((i) => i.producto.id === producto.id)
-      if (linea) {
-        if (linea.cantidad + 1 > producto.disponible) return false
-        linea.cantidad++
-      } else {
-        this.items.push({ producto, cantidad: 1, cucharas_extra: 0 })
-      }
-      return true
+      if (linea) linea.cantidad++
+      else this.items.push({ producto, cantidad: 1, cucharas_extra: 0 })
     },
     cambiar(id, delta) {
       const linea = this.items.find((i) => i.producto.id === id)
       if (!linea) return
-      if (delta > 0 && linea.cantidad + delta > linea.producto.disponible) return
       linea.cantidad += delta
       if (linea.cantidad <= 0) this.quitar(id)
     },

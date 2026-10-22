@@ -17,17 +17,16 @@ use App\Http\Controllers\VentaController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
-
 // Diagnóstico: versión del backend y migraciones que faltan (lo usa la app para avisar si el servidor está desactualizado)
 Route::get('/estado', function () {
     $faltan = [];
     foreach (['fondos_caja', 'proveedores', 'venta_consumos', 'ventas_eliminadas'] as $t) {
         if (!Schema::hasTable($t)) $faltan[] = "tabla $t";
     }
-    foreach ([['cortes', 'saldo_inicial'], ['cortes', 'total_250'], ['users', 'password_visible']] as [$t, $c]) {
+    foreach ([['cortes', 'saldo_inicial'], ['cortes', 'total_250'], ['users', 'password_visible'], ['productos', 'boing_insumo_id']] as [$t, $c]) {
         if (!Schema::hasColumn($t, $c)) $faltan[] = "columna $t.$c";
     }
-    return ['version' => 4, 'migraciones_pendientes' => $faltan, 'ok' => !$faltan];
+    return ['version' => 5, 'migraciones_pendientes' => $faltan, 'ok' => !$faltan];
 });
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
@@ -64,6 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('vendedores/{user}', [UserController::class, 'update']);
         Route::get('vendedores/{user}/inventario', [AsignacionController::class, 'inventario']);
         Route::get('vendedores/{user}/fondo', [FondoController::class, 'show']);
+        Route::get('vendedores/{user}/capacidad', [ProductoController::class, 'capacidadVendedor']);
         Route::post('fondos', [FondoController::class, 'store']);
 
         Route::post('asignaciones', [AsignacionController::class, 'store']);
@@ -77,6 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ---------- Vendedor ----------
     Route::middleware('role:vendedor')->prefix('vendedor')->group(function () {
         Route::get('productos', [ProductoController::class, 'disponibles']);
+        Route::get('capacidad', [ProductoController::class, 'capacidad']);
         Route::get('inventario', fn (\Illuminate\Http\Request $r) => app(AsignacionController::class)->inventario($r->user()));
         Route::get('ventas', [VentaController::class, 'index']);
         Route::post('ventas', [VentaController::class, 'store']);
