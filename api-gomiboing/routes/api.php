@@ -14,8 +14,24 @@ use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\RecetaController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VentaController;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+
+Route::get('/forzar-migracion', function () {
+    try {
+        $output = '';
+        Artisan::call('migrate', ['--force' => true]);
+        $output .= "Migraciones:\n" . Artisan::output() . "\n";
+        
+        Artisan::call('optimize:clear');
+        $output .= "Caché limpia.\n";
+        
+        return '<pre>' . $output . '</pre>';
+    } catch (\Exception $e) {
+        return '<pre>ERROR SQL:\n' . $e->getMessage() . '</pre>';
+    }
+});
 
 // Diagnóstico: versión del backend y migraciones que faltan (lo usa la app para avisar si el servidor está desactualizado)
 Route::get('/estado', function () {
